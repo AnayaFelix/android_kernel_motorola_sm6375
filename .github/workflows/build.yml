@@ -9,26 +9,42 @@ jobs:
     steps:
     - name: Checkout kernel
       uses: actions/checkout@v4
+      with:
+        fetch-depth: 0
 
     - name: Install dependencies
       run: |
         sudo apt update
-        sudo apt install -y git make gcc bc bison flex libssl-dev libelf-dev
+        sudo apt install -y git make bc bison flex libssl-dev libelf-dev \
+                            build-essential python3 cpio lz4
 
-    - name: Find defconfig
+    - name: Setup build environment
       run: |
-        ls arch/arm64/configs/vendor/ext_config/
+        # Baixar toolchains oficiais do Google
+        git clone --depth=1 https://android.googlesource.com/platform/prebuilts/gcc/linux-x86/aarch64/aarch64-linux-android-4.9 -b android13-gsi prebuilts/gcc
+        git clone --depth=1 https://android.googlesource.com/platform/prebuilts/clang/host/linux-x86 -b android13-gsi prebuilts/clang
+        git clone --depth=1 https://android.googlesource.com/platform/prebuilts/build-tools -b android13-gsi prebuilts/build-tools
 
     - name: Build kernel
       run: |
-        export ARCH=arm64
-        export SUBARCH=arm64
-        export CROSS_COMPILE=aarch64-linux-gnu-
-        make vendor/ext_config/moto-holi-rhodep.config
-        make -j$(nproc)
+        export ROOT_DIR=$PWD
+        export KERNEL_DIR=.
+        export OUT_DIR=out
+        
+        # Carregar configurações do build.config
+        source build.config.gki.aarch64
+        
+        # Configurar PATH
+        export PATH=$PWD/prebuilts/clang/clang-r416183b/bin:$PWD/prebuilts/gcc/bin:$PWD/prebuilts/build-tools/path/linux-x86:$PATH
+        
+        # Compilar
+        make O=$OUT_DIR $DEFCONFIG
+        make O=$OUT_DIR -j$(nproc)
 
-    - name: Upload boot image
+    - name: Upload kernel image
       uses: actions/upload-artifact@v4
       with:
-        name: boot-image
-        path: arch/arm64/boot/Image.gz
+        name: kernel-image
+        path: |
+          out/arch/arm64/boot/Image.gz
+          out/arch/arm64/boot/Image
