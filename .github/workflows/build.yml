@@ -1,0 +1,30 @@
+name: Build Kernel
+
+on:
+  workflow_dispatch:
+
+jobs:
+  build:
+    runs-on: ubuntu-22.04
+    steps:
+    - name: Checkout kernel
+      uses: actions/checkout@v4
+
+    - name: Install dependencies
+      run: |
+        sudo apt update
+        sudo apt install -y git make gcc bc bison flex libssl-dev libelf-dev
+
+    - name: Build kernel
+      run: |
+        export ARCH=arm64
+        export SUBARCH=arm64
+        export CROSS_COMPILE=aarch64-linux-gnu-
+        make vendor/holi_GKI.config
+        make -j$(nproc)
+
+    - name: Upload boot image
+      uses: actions/upload-artifact@v4
+      with:
+        name: boot-image
+        path: arch/arm64/boot/Image.gz
